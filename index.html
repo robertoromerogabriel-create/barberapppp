@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barbería Elite - Gestor de Turnos y Administración</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{colors:{'gold-accent':'#D4AF37'},fontFamily:{serif:['"Playfair Display"','Georgia','serif'],sans:['Inter','system-ui','sans-serif']}}}}
+</script>
+<style type="text/tailwindcss">
+.inp{@apply w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-gold-accent transition}
+.lbl{@apply block text-sm text-gray-400 mb-1}
+.btn-gold{@apply bg-gold-accent text-neutral-900 font-semibold rounded-lg px-5 py-2.5 hover:brightness-110 hover:-translate-y-0.5 shadow-lg transition}
+.btn-sec{@apply border border-white/20 text-gray-200 rounded-lg px-5 py-2.5 hover:border-gold-accent hover:text-gold-accent transition}
+.card{@apply bg-neutral-900 border border-white/10 rounded-2xl shadow-lg}
+.tab{@apply whitespace-nowrap px-4 py-3 border-b-2 border-transparent text-gray-400 hover:text-white transition}
+.tab.on{@apply border-gold-accent text-gold-accent}
+.th{@apply px-4 py-3 text-left text-xs uppercase tracking-wide text-gray-400 font-medium}
+.td{@apply px-4 py-3 align-middle}
+</style>
+</head>
+<body class="bg-neutral-950 text-gray-200 font-sans min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-40 bg-black/90 backdrop-blur border-b border-white/10">
+ <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+  <div><div class="font-serif text-xl sm:text-2xl font-bold text-gold-accent leading-none">LEGACY BARBER</div><div class="text-[11px] text-gray-400">Club &amp; Barbershop</div></div>
+  <div class="flex bg-neutral-900 border border-white/10 rounded-full p-1 text-sm">
+   <button id="mode-client" onclick="switchMode('client')" class="px-3 sm:px-4 py-1.5 rounded-full transition">Modo Cliente</button>
+   <button id="mode-barber" onclick="switchMode('barber')" class="px-3 sm:px-4 py-1.5 rounded-full transition">Modo Barbero</button>
+  </div>
+ </div>
+</header>
+
+<div id="toast" class="fixed bottom-4 right-4 z-[60] max-w-xs card border-gold-accent/40 px-4 py-3 translate-y-24 opacity-0 pointer-events-none transition-all duration-300">
+ <div id="toast-title" class="font-semibold text-gold-accent">Notificación</div><div id="toast-msg" class="text-sm text-gray-300">Mensaje del sistema</div>
+</div>
+
+<main class="flex-1">
+<!-- ═══ CLIENTE ═══ -->
+<section id="view-client">
+ <div class="relative overflow-hidden" style="background:radial-gradient(ellipse at 80% 0%,rgba(212,175,55,.22),transparent 55%),linear-gradient(135deg,#0a0a0a,#1c1917 60%,#0a0a0a)">
+  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="relative max-w-7xl mx-auto px-4 py-20 sm:py-28 max-w-3xl">
+   <div class="max-w-2xl">
+    <div class="text-gold-accent text-sm font-medium mb-3">Experiencia Premium</div>
+    <h1 class="font-serif text-4xl sm:text-6xl font-bold text-white leading-tight">Estilo, Precisión y Elegancia.</h1>
+    <p class="mt-5 text-gray-300 text-lg">Reserva tu turno en línea con nuestros maestros barberos de manera rápida y sin complicaciones.</p>
+    <div class="mt-8 flex flex-wrap gap-3">
+     <a href="#services-section" class="btn-sec" onclick="event.preventDefault();scrollToId('services-section')">Ver Servicios</a>
+     <button class="btn-gold" onclick="switchClientTab('book');scrollToId('booking-form-card')">Reservar Turno</button>
+    </div>
+   </div>
+  </div>
+ </div>
+
+ <div class="max-w-7xl mx-auto px-4">
+  <div class="flex overflow-x-auto border-b border-white/10 mt-6">
+   <button id="ctab-book" class="tab" onclick="switchClientTab('book')">Reservar Cita</button>
+   <button id="ctab-mine" class="tab" onclick="switchClientTab('mine')">Mis Turnos</button>
+  </div>
+
+  <div id="cpanel-book" class="py-10 space-y-12">
+   <div id="services-section" class="scroll-mt-24">
+    <h2 class="font-serif text-3xl text-white">Nuestros Servicios</h2>
+    <p class="text-gray-400 mb-6">Selecciona el tratamiento perfecto para tu estilo</p>
+    <div id="client-services" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"></div>
+   </div>
+
+   <div id="booking-form-card" class="card p-6 sm:p-8 max-w-3xl mx-auto w-full scroll-mt-24">
+    <h2 class="font-serif text-3xl text-white">Agendar Tu Cita</h2>
+    <p class="text-gray-400 mb-6">Completa tus datos para confirmar la reserva</p>
+    <form id="booking-form" onsubmit="handleBookAppointment(event)" class="space-y-6">
+     <div>
+      <h3 class="text-gold-accent font-semibold mb-3">1. Tus Datos</h3>
+      <div class="grid sm:grid-cols-2 gap-4">
+       <div><label class="lbl">Nombre Completo *</label><input id="b-name" required class="inp" placeholder="Ej: Juan Pérez"></div>
+       <div><label class="lbl">Teléfono / WhatsApp *</label><input id="b-phone" required type="tel" class="inp" placeholder="Ej: 1155551234"></div>
+       <div class="sm:col-span-2"><label class="lbl">Correo Electrónico (opcional)</label><input id="b-email" type="email" class="inp" placeholder="correo@ejemplo.com"></div>
+      </div>
+     </div>
+     <div>
+      <h3 class="text-gold-accent font-semibold mb-3">2. Detalles del Servicio</h3>
+      <div class="grid sm:grid-cols-2 gap-4">
+       <div><label class="lbl">Servicio Seleccionado *</label><select id="b-service" required class="inp" onchange="updateBookingSummary()"></select></div>
+       <div><label class="lbl">Barbero de Preferencia *</label><select id="b-barber" required class="inp"></select></div>
+       <div><label class="lbl">Fecha *</label><input id="b-date" type="date" required class="inp"></div>
+       <div><label class="lbl">Hora *</label><select id="b-time" required class="inp"></select></div>
+      </div>
+     </div>
+     <div class="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
+      <div><div class="text-sm text-gray-400">Total Estimado</div><div id="b-total" class="text-3xl font-serif text-gold-accent">$0.00</div></div>
+      <button type="submit" class="btn-gold w-full sm:w-auto">Confirmar Reserva</button>
+     </div>
+    </form>
+   </div>
+  </div>
+
+  <div id="cpanel-mine" class="py-10 hidden max-w-3xl mx-auto w-full">
+   <h2 class="font-serif text-3xl text-white">Consultar Citas</h2>
+   <p class="text-gray-400 mb-5">Ingresa tu número de teléfono registrado para ver tus turnos</p>
+   <div class="flex gap-3 mb-6"><input id="my-phone" type="tel" class="inp" placeholder="Tu teléfono" onkeydown="if(event.key==='Enter')renderClientAppointments()"><button class="btn-gold" onclick="renderClientAppointments()">Buscar</button></div>
+   <div id="my-appointments" class="space-y-4"></div>
+  </div>
+ </div>
+</section>
+
+<!-- ═══ BARBERO ═══ -->
+<section id="view-barber" class="hidden max-w-7xl mx-auto px-4 py-10 space-y-8 w-full">
+ <div class="flex flex-wrap items-end justify-between gap-4">
+  <div><div class="text-gold-accent text-sm">Panel de Control</div><h2 class="font-serif text-3xl text-white">Administración General</h2></div>
+  <div class="flex flex-wrap gap-3"><button class="btn-gold" onclick="openWalkInModal()">Cobro Rápido / Walk-In</button><button class="btn-sec" onclick="exportReport()">Exportar Resumen</button></div>
+ </div>
+
+ <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="card p-5"><div class="text-sm text-gray-400">Caja del Día</div><div id="st-day" class="text-3xl font-serif text-gold-accent mt-1">$0.00</div><div id="st-day-sub" class="text-xs text-gray-500 mt-1">0 servicios completados hoy</div></div>
+  <div class="card p-5"><div class="text-sm text-gray-400">Caja del Mes</div><div id="st-month" class="text-3xl font-serif text-gold-accent mt-1">$0.00</div><div id="st-month-sub" class="text-xs text-gray-500 mt-1">0 atenciones totales en el mes</div></div>
+  <div class="card p-5"><div class="text-sm text-gray-400">Clientes Registrados</div><div id="st-clients" class="text-3xl font-serif text-white mt-1">0</div><div class="text-xs text-gray-500 mt-1">Base de datos activa</div></div>
+  <div class="card p-5"><div class="text-sm text-gray-400">Turnos Pendientes</div><div id="st-pending" class="text-3xl font-serif text-white mt-1">0</div><div class="text-xs text-gray-500 mt-1">Por atender en la agenda</div></div>
+ </div>
+
+ <div class="grid gap-6 lg:grid-cols-2">
+  <div class="card p-5">
+   <h3 class="font-serif text-xl text-white">Métodos de Pago</h3><p class="text-sm text-gray-400 mb-4">Desglose de ingresos por canal</p>
+   <div class="flex items-center gap-5"><div class="w-40 h-40 shrink-0"><canvas id="chart-pay"></canvas></div><ul id="pay-list" class="space-y-2 text-sm flex-1"></ul></div>
+  </div>
+  <div class="card p-5">
+   <h3 class="font-serif text-xl text-white">Balance de Ingresos</h3><p class="text-sm text-gray-400 mb-4">Evolución de recaudación reciente</p>
+   <div class="h-44"><canvas id="chart-line"></canvas></div>
+  </div>
+ </div>
+
+ <div>
+  <div class="flex overflow-x-auto border-b border-white/10">
+   <button id="btab-agenda" class="tab" onclick="switchBarberTab('agenda')">Agenda y Turnos</button>
+   <button id="btab-clients" class="tab" onclick="switchBarberTab('clients')">Base de Clientes</button>
+   <button id="btab-services" class="tab" onclick="switchBarberTab('services')">Gestión de Servicios</button>
+  </div>
+
+  <div id="bpanel-agenda" class="pt-6 space-y-4">
+   <div class="grid gap-3 sm:grid-cols-3">
+    <input id="f-date" type="date" class="inp" onchange="renderBarberAgenda()">
+    <select id="f-status" class="inp" onchange="renderBarberAgenda()"><option value="">Todos los Estados</option><option>Pendiente</option><option>Completado</option><option>Cancelado</option></select>
+    <input id="f-text" class="inp" placeholder="Buscar cliente o barbero..." oninput="renderBarberAgenda()">
+   </div>
+   <div class="card overflow-x-auto"><table class="w-full text-sm min-w-[860px]"><thead class="border-b border-white/10"><tr><th class="th">Hora / Fecha</th><th class="th">Cliente</th><th class="th">Servicio</th><th class="th">Barbero</th><th class="th">Monto &amp; Pago</th><th class="th">Estado</th><th class="th">Acciones</th></tr></thead><tbody id="agenda-body" class="divide-y divide-white/5"></tbody></table></div>
+  </div>
+
+  <div id="bpanel-clients" class="pt-6 space-y-4 hidden">
+   <div class="flex gap-3"><input id="c-search" class="inp" placeholder="Buscar por nombre o teléfono..." oninput="renderBarberClients()"><button class="btn-gold whitespace-nowrap" onclick="openModal('modal-client')">Agregar Cliente</button></div>
+   <div class="card overflow-x-auto"><table class="w-full text-sm min-w-[700px]"><thead class="border-b border-white/10"><tr><th class="th">Cliente</th><th class="th">Contacto</th><th class="th">Visitas Totales</th><th class="th">Gasto Acumulado</th><th class="th">Última Visita</th></tr></thead><tbody id="clients-body" class="divide-y divide-white/5"></tbody></table></div>
+  </div>
+
+  <div id="bpanel-services" class="pt-6 space-y-4 hidden">
+   <div class="flex flex-wrap items-end justify-between gap-3"><div><h3 class="font-serif text-2xl text-white">Catálogo de Servicios</h3><p class="text-gray-400 text-sm">Edita precios o añade nuevas opciones para tus clientes</p></div><button class="btn-gold" onclick="openServiceModal()">Nuevo Servicio</button></div>
+   <div id="barber-services" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"></div>
+  </div>
+ </div>
+</section>
+</main>
+
+<footer class="border-t border-white/10 text-center text-sm text-gray-500 py-6 px-4">© 2026 Legacy Barber Club. Sistema Integrado de Gestión de Barberías.</footer>
+
+<!-- ═══ MODALES ═══ -->
+<div id="modal-walkin" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+ <form onsubmit="handleWalkInSubmit(event)" class="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto space-y-4">
+  <h3 class="font-serif text-2xl text-white">Registrar Cobro Manual (Walk-In)</h3>
+  <div><label class="lbl">Nombre del Cliente *</label><input id="w-name" required class="inp"></div>
+  <div><label class="lbl">Teléfono (Opcional)</label><input id="w-phone" type="tel" class="inp"></div>
+  <div><label class="lbl">Servicio *</label><select id="w-service" required class="inp" onchange="walkInAutoPrice()"></select></div>
+  <div><label class="lbl">Barbero que Atendió *</label><select id="w-barber" required class="inp"></select></div>
+  <div><label class="lbl">Método de Pago *</label><select id="w-pay" required class="inp"><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia MP</option><option value="Tarjeta">Tarjeta Débito/Crédito</option></select></div>
+  <div><label class="lbl">Monto Cobrado ($)</label><input id="w-amount" type="number" min="0" step="1" class="inp"></div>
+  <div class="flex justify-end gap-3 pt-2"><button type="button" class="btn-sec" onclick="closeModal('modal-walkin')">Cancelar</button><button class="btn-gold">Registrar y Cobrar</button></div>
+ </form>
+</div>
+
+<div id="modal-client" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+ <form onsubmit="handleSaveClient(event)" class="card p-6 w-full max-w-md space-y-4">
+  <h3 class="font-serif text-2xl text-white">Nuevo Cliente</h3>
+  <div><label class="lbl">Nombre Completo *</label><input id="nc-name" required class="inp"></div>
+  <div><label class="lbl">Teléfono / WhatsApp *</label><input id="nc-phone" required type="tel" class="inp"></div>
+  <div><label class="lbl">Email</label><input id="nc-email" type="email" class="inp"></div>
+  <div class="flex justify-end gap-3 pt-2"><button type="button" class="btn-sec" onclick="closeModal('modal-client')">Cancelar</button><button class="btn-gold">Guardar Cliente</button></div>
+ </form>
+</div>
+
+<div id="modal-service" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+ <form onsubmit="handleSaveService(event)" class="card p-6 w-full max-w-md space-y-4">
+  <h3 id="svc-modal-title" class="font-serif text-2xl text-white">Gestión de Servicio</h3>
+  <input type="hidden" id="s-id">
+  <div><label class="lbl">Nombre del Servicio *</label><input id="s-name" required class="inp"></div>
+  <div><label class="lbl">Descripción Breve</label><textarea id="s-desc" rows="2" class="inp"></textarea></div>
+  <div class="grid grid-cols-2 gap-4"><div><label class="lbl">Precio ($) *</label><input id="s-price" type="number" min="0" step="1" required class="inp"></div><div><label class="lbl">Duración (Mins) *</label><input id="s-dur" type="number" min="1" value="30" required class="inp"></div></div>
+  <div class="flex justify-end gap-3 pt-2"><button type="button" class="btn-sec" onclick="closeModal('modal-service')">Cancelar</button><button class="btn-gold">Guardar</button></div>
+ </form>
+</div>
+
+<div id="modal-checkout" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+ <form onsubmit="handleCheckoutSubmit(event)" class="card p-6 w-full max-w-md space-y-4">
+  <h3 class="font-serif text-2xl text-white">Completar y Cobrar Turno</h3>
+  <input type="hidden" id="co-id">
+  <div class="bg-black/40 rounded-lg p-3 text-sm"><div id="co-client" class="text-white"></div><div id="co-service" class="text-gray-400"></div></div>
+  <div><label class="lbl">Método de Pago *</label><select id="co-pay" required class="inp"><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia MP</option><option value="Tarjeta">Tarjeta Débito/Crédito</option></select></div>
+  <div><label class="lbl">Monto Final Cobrado ($)</label><input id="co-amount" type="number" min="0" step="1" required class="inp"></div>
+  <div class="flex justify-end gap-3 pt-2"><button type="button" class="btn-sec" onclick="closeModal('modal-checkout')">Cancelar</button><button class="btn-gold">Confirmar Cobro</button></div>
+ </form>
+</div>
+
+<script>
+/* ═══ Capa de datos (localStorage con interfaz tipo REST; reemplazable por fetch a una API real) ═══ */
+const rd=c=>JSON.parse(localStorage.getItem('lb_'+c)||'[]'), wr=(c,a)=>localStorage.setItem('lb_'+c,JSON.stringify(a));
+async function apiGet(c){try{return rd(c)}catch(e){console.error('apiGet',e);return[]}}
+async function apiPost(c,o){try{const a=rd(c);a.push(o);wr(c,a);return o}catch(e){console.error('apiPost',e)}}
+async function apiPut(c,id,o){try{const a=rd(c).map(x=>x.id===id?{...x,...o}:x);wr(c,a);return o}catch(e){console.error('apiPut',e)}}
+async function apiDelete(c,id){try{wr(c,rd(c).filter(x=>x.id!==id));return true}catch(e){console.error('apiDelete',e)}}
+
+/* ═══ Estado y utilidades ═══ */
+let services=[],clients=[],appointments=[],charts={};
+const BARBERS=['Dylan Romero','Tomas Gallardo','Ezequiel Gallardo','Leandro Maidana'];
+const HOURS=['10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+const DEFAULT_SERVICES=[
+ {id:'srv-1',name:'Corte de Pelo Elite',description:'Corte personalizado con lavado, perfilado y peinado con cera mate.',price:15000,duration:45},
+ {id:'srv-2',name:'Arreglo & Ritual de Barba',description:'Toalla caliente, perfilado a navaja tradicional y aceites esenciales.',price:10000,duration:30},
+ {id:'srv-3',name:'Combo Legacy (Pelo + Barba)',description:'Servicio completo de corte, barba premium, lavado y exfoliación facial.',price:22000,duration:75},
+ {id:'srv-4',name:'Perfilado de Cejas / Diseños',description:'Definición precisa a navaja o tijera.',price:5000,duration:20}];
+const $=id=>document.getElementById(id);
+const money=n=>'$'+Number(n||0).toLocaleString('es-AR');
+const todayStr=()=>new Date().toLocaleDateString('en-CA');
+const nowTime=()=>new Date().toTimeString().slice(0,5);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate=d=>{const[y,m,day]=d.split('-');return `${day}/${m}/${y}`};
+const badge=s=>`<span class="px-2.5 py-1 rounded-full text-xs font-medium ${{Pendiente:'bg-yellow-500/15 text-yellow-400',Completado:'bg-green-500/15 text-green-400',Cancelado:'bg-red-500/15 text-red-400'}[s]}">${s}</span>`;
+const scrollToId=id=>$(id).scrollIntoView({behavior:'smooth',block:'start'});
+const barberOpts=BARBERS.map(b=>`<option>${b}</option>`).join('');
+let toastT;
+function showToast(t,m){$('toast-title').textContent=t;$('toast-msg').textContent=m;const e=$('toast');e.classList.remove('translate-y-24','opacity-0');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.add('translate-y-24','opacity-0'),3500)}
+const openModal=id=>$(id).classList.remove('hidden'), closeModal=id=>$(id).classList.add('hidden');
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('[id^=modal-]').forEach(m=>m.classList.add('hidden'))});
+
+/* ═══ Navegación ═══ */
+function switchMode(m){
+ $('view-client').classList.toggle('hidden',m!=='client');$('view-barber').classList.toggle('hidden',m!=='barber');
+ const on='bg-gold-accent text-neutral-900 font-semibold',off='text-gray-400 hover:text-white';
+ ['client','barber'].forEach(k=>{$('mode-'+k).className='px-3 sm:px-4 py-1.5 rounded-full transition '+(k===m?on:off)});
+ if(m==='barber')renderBarberDashboard();
+}
+function setTabs(prefix,names,active){names.forEach(n=>{$(prefix+'tab-'+n).classList.toggle('on',n===active);$(prefix+'panel-'+n).classList.toggle('hidden',n!==active)})}
+function switchClientTab(t){setTabs('c',['book','mine'],t);if(t==='mine')renderClientAppointments()}
+function switchBarberTab(t){setTabs('b',['agenda','clients','services'],t)}
+
+/* ═══ Cliente ═══ */
+function renderClientServices(){
+ $('client-services').innerHTML=services.map(s=>`<div class="card p-5 flex flex-col hover:border-gold-accent/50 hover:-translate-y-1 transition">
+  <h3 class="font-serif text-lg text-white">${esc(s.name)}</h3><div class="text-xs text-gray-500 mb-2">${s.duration} min</div>
+  <p class="text-sm text-gray-400 flex-1">${esc(s.description)||'Sin descripción'}</p>
+  <div class="text-2xl font-serif text-gold-accent mt-4">${money(s.price)}</div>
+  <button class="btn-gold mt-3" onclick="selectService('${s.id}')">Agendar</button></div>`).join('')}
+function selectService(id){switchClientTab('book');$('b-service').value=id;updateBookingSummary();scrollToId('booking-form-card')}
+function populateServiceOptions(){
+ const b=$('b-service').value,w=$('w-service').value;
+ $('b-service').innerHTML=services.map(s=>`<option value="${s.id}">${esc(s.name)} (${money(s.price)})</option>`).join('');
+ $('w-service').innerHTML=services.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+ if(services.some(s=>s.id===b))$('b-service').value=b; if(services.some(s=>s.id===w))$('w-service').value=w;
+ updateBookingSummary();
+}
+function updateBookingSummary(){const s=services.find(x=>x.id===$('b-service').value);$('b-total').textContent=s?money(s.price):'$0.00'}
+async function handleBookAppointment(e){
+ e.preventDefault();
+ const name=$('b-name').value.trim(),phone=$('b-phone').value.trim(),email=$('b-email').value.trim();
+ const s=services.find(x=>x.id===$('b-service').value);if(!s)return;
+ if(!clients.some(c=>c.phone===phone)){
+  const c={id:'cli-'+Date.now(),name,phone,email,visits:0,spent:0,lastVisit:'Sin visitas aún'};clients.push(c);await apiPost('clients',c)}
+ const a={id:'apt-'+Date.now(),clientName:name,clientPhone:phone,serviceId:s.id,serviceName:s.name,barber:$('b-barber').value,date:$('b-date').value,time:$('b-time').value,price:s.price,status:'Pendiente',paymentMethod:null};
+ appointments.push(a);await apiPost('appointments',a);
+ showToast('Reserva Confirmada',`Tu cita para el ${fmtDate(a.date)} a las ${a.time} hs fue agendada exitosamente.`);
+ $('my-phone').value=phone;switchClientTab('mine');$('booking-form').reset();$('b-date').value='';updateBookingSummary();renderBarberDashboard();
+}
+function renderClientAppointments(){
+ const p=$('my-phone').value.trim(),box=$('my-appointments');
+ if(!p){box.innerHTML='<p class="text-gray-500 text-center py-8">Ingresa tu número de teléfono arriba para buscar tus turnos agendados.</p>';return}
+ const list=appointments.filter(a=>a.clientPhone===p).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+ if(!list.length){box.innerHTML=`<p class="text-gray-500 text-center py-8">No se encontraron citas vinculadas al número ${esc(p)}.</p>`;return}
+ box.innerHTML=list.map(a=>`<div class="card p-5"><div class="flex justify-between items-start gap-3"><h3 class="font-serif text-lg text-white">${esc(a.serviceName)}</h3>${badge(a.status)}</div>
+  <div class="grid sm:grid-cols-2 gap-1 text-sm text-gray-400 mt-3"><div>Fecha: <span class="text-gray-200">${fmtDate(a.date)}</span></div><div>Hora: <span class="text-gray-200">${a.time} hs</span></div><div>Barbero: <span class="text-gray-200">${esc(a.barber)}</span></div><div>Precio: <span class="text-gold-accent">${money(a.price)}</span></div></div>
+  ${a.status==='Pendiente'?`<button class="btn-sec mt-4 text-sm !py-1.5" onclick="cancelClientAppointment('${a.id}')">Cancelar Cita</button>`:''}</div>`).join('')}
+async function cancelClientAppointment(id){
+ if(!confirm('¿Estás seguro de cancelar esta cita?'))return;
+ await changeAppointmentStatus(id,'Cancelado',true);showToast('Cita Cancelada','Tu cita fue cancelada correctamente.');renderClientAppointments()}
+
+/* ═══ Barbero: dashboard ═══ */
+const sum=l=>l.reduce((t,a)=>t+Number(a.price||0),0);
+function renderBarberDashboard(){
+ const done=appointments.filter(a=>a.status==='Completado'),t=todayStr();
+ const day=done.filter(a=>a.date===t),mon=done.filter(a=>a.date.slice(0,7)===t.slice(0,7));
+ $('st-day').textContent=money(sum(day));$('st-day-sub').textContent=`${day.length} servicios completados hoy`;
+ $('st-month').textContent=money(sum(mon));$('st-month-sub').textContent=`${mon.length} atenciones totales en el mes`;
+ $('st-clients').textContent=clients.length;$('st-pending').textContent=appointments.filter(a=>a.status==='Pendiente').length;
+ renderCharts();renderBarberAgenda();renderBarberClients();renderBarberServices();
+}
+function renderCharts(){
+ if(typeof Chart==='undefined')return;
+ const done=appointments.filter(a=>a.status==='Completado');
+ const pm=['Efectivo','Transferencia','Tarjeta'],col=['#10B981','#60A5FA','#FBBF24'],vals=pm.map(m=>sum(done.filter(a=>a.paymentMethod===m)));
+ $('pay-list').innerHTML=pm.map((m,i)=>`<li class="flex justify-between gap-2"><span class="flex items-center gap-2"><i class="w-2.5 h-2.5 rounded-full inline-block" style="background:${col[i]}"></i>${m}</span><span class="text-white">${money(vals[i])}</span></li>`).join('');
+ const hasData=vals.some(v=>v>0);
+ charts.pay?.destroy();
+ charts.pay=new Chart($('chart-pay'),{type:'doughnut',data:{labels:pm,datasets:[{data:hasData?vals:[1,0,0],backgroundColor:hasData?col:['#262626'],borderWidth:0}]},options:{plugins:{legend:{display:false},tooltip:{enabled:hasData}},cutout:'68%',maintainAspectRatio:false}});
+ const days=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d});
+ const labels=days.map(d=>d.toLocaleDateString('es-AR',{weekday:'short',day:'numeric'}).replace(',','')),
+  data=days.map(d=>sum(done.filter(a=>a.date===d.toLocaleDateString('en-CA'))));
+ charts.line?.destroy();
+ charts.line=new Chart($('chart-line'),{type:'line',data:{labels,datasets:[{label:'Ingresos',data,borderColor:'#D4AF37',backgroundColor:'rgba(212,175,55,.15)',fill:true,tension:.3,pointBackgroundColor:'#D4AF37'}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#9CA3AF'}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#9CA3AF',callback:v=>money(v)}}}}});
+}
+
+/* ═══ Barbero: agenda ═══ */
+function renderBarberAgenda(){
+ const d=$('f-date').value,st=$('f-status').value,q=$('f-text').value.toLowerCase().trim();
+ const list=appointments.filter(a=>(!d||a.date===d)&&(!st||a.status===st)&&(!q||a.clientName.toLowerCase().includes(q)||a.barber.toLowerCase().includes(q))).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+ $('agenda-body').innerHTML=list.length?list.map(a=>{
+  const ab='class="px-2.5 py-1 rounded-md text-xs border transition ';
+  const acts=a.status==='Pendiente'
+   ?`<button ${ab}border-green-500/40 text-green-400 hover:bg-green-500/10" onclick="openCheckoutModal('${a.id}')">Cobrar</button> <button ${ab}border-red-500/40 text-red-400 hover:bg-red-500/10" onclick="changeAppointmentStatus('${a.id}','Cancelado')">Cancelar</button>`
+   :`<button ${ab}border-white/20 text-gray-300 hover:border-gold-accent" onclick="changeAppointmentStatus('${a.id}','Pendiente')">Reabrir</button> <button ${ab}border-red-500/40 text-red-400 hover:bg-red-500/10" onclick="deleteAppointment('${a.id}')">Eliminar</button>`;
+  return `<tr class="hover:bg-white/5"><td class="td"><div class="text-white font-medium">${a.time} hs</div><div class="text-xs text-gray-500">${fmtDate(a.date)}</div></td>
+  <td class="td"><div class="text-white">${esc(a.clientName)}</div><div class="text-xs text-gray-500">${esc(a.clientPhone)}</div></td><td class="td">${esc(a.serviceName)}</td><td class="td">${esc(a.barber)}</td>
+  <td class="td"><div class="text-gold-accent">${money(a.price)}</div><div class="text-xs text-gray-500">${a.paymentMethod||'No abonado'}</div></td><td class="td">${badge(a.status)}</td><td class="td whitespace-nowrap">${acts}</td></tr>`}).join('')
+  :'<tr><td colspan="7" class="td text-center text-gray-500 py-8">No hay turnos registrados que coincidan con el filtro.</td></tr>';
+}
+function openCheckoutModal(id){
+ const a=appointments.find(x=>x.id===id);if(!a)return;
+ $('co-id').value=id;$('co-client').textContent='Cliente: '+a.clientName;$('co-service').textContent=`Servicio: ${a.serviceName} - Barbero: ${a.barber}`;$('co-amount').value=a.price;openModal('modal-checkout')}
+async function bumpClient(phone,name,amount,sign,date){
+ let c=clients.find(x=>x.phone===phone);if(!c)return;
+ c.visits=Math.max(0,c.visits+sign);c.spent=Math.max(0,c.spent+sign*amount);
+ if(sign>0)c.lastVisit=fmtDate(date);await apiPut('clients',c.id,c)}
+async function handleCheckoutSubmit(e){
+ e.preventDefault();
+ const a=appointments.find(x=>x.id===$('co-id').value);if(!a)return;
+ const amount=Number($('co-amount').value)||0;
+ Object.assign(a,{status:'Completado',paymentMethod:$('co-pay').value,price:amount});
+ await apiPut('appointments',a.id,a);await bumpClient(a.clientPhone,a.clientName,amount,1,todayStr());
+ closeModal('modal-checkout');showToast('Turno Completado','El pago fue registrado y la caja actualizada.');renderBarberDashboard()}
+async function changeAppointmentStatus(id,status,silent){
+ const a=appointments.find(x=>x.id===id);if(!a)return;
+ if(a.status==='Completado'&&status==='Pendiente')await bumpClient(a.clientPhone,a.clientName,a.price,-1);
+ a.status=status;if(status!=='Completado')a.paymentMethod=null;
+ await apiPut('appointments',id,a);
+ if(!silent){showToast('Turno Actualizado',`El turno pasó a estado ${status}.`);renderBarberDashboard()}}
+async function deleteAppointment(id){
+ if(!confirm('¿Eliminar esta cita del historial?'))return;
+ const a=appointments.find(x=>x.id===id);
+ if(a&&a.status==='Completado')await bumpClient(a.clientPhone,a.clientName,a.price,-1);
+ appointments=appointments.filter(x=>x.id!==id);await apiDelete('appointments',id);showToast('Cita Eliminada','El turno fue quitado del historial.');renderBarberDashboard()}
+
+/* ═══ Barbero: clientes ═══ */
+function renderBarberClients(){
+ const q=$('c-search').value.toLowerCase().trim();
+ const list=clients.filter(c=>!q||c.name.toLowerCase().includes(q)||c.phone.includes(q));
+ $('clients-body').innerHTML=list.length?list.map(c=>`<tr class="hover:bg-white/5"><td class="td text-white">${esc(c.name)}</td><td class="td"><div>${esc(c.phone)}</div><div class="text-xs text-gray-500">${esc(c.email)||'Sin Email'}</div></td>
+  <td class="td">${c.visits} servicios</td><td class="td text-gold-accent">${money(c.spent)}</td><td class="td text-gray-400">${esc(c.lastVisit)}</td></tr>`).join('')
+  :'<tr><td colspan="5" class="td text-center text-gray-500 py-8">No hay clientes registrados en la base de datos.</td></tr>';
+}
+async function handleSaveClient(e){
+ e.preventDefault();const phone=$('nc-phone').value.trim();
+ if(clients.some(c=>c.phone===phone)){alert('Ya existe un cliente con este número de teléfono.');return}
+ const c={id:'cli-'+Date.now(),name:$('nc-name').value.trim(),phone,email:$('nc-email').value.trim(),visits:0,spent:0,lastVisit:'Sin visitas aún'};
+ clients.push(c);await apiPost('clients',c);e.target.reset();closeModal('modal-client');showToast('Cliente Agregado','El cliente fue registrado en la base de datos.');renderBarberDashboard()}
+
+/* ═══ Barbero: servicios ═══ */
+function renderBarberServices(){
+ $('barber-services').innerHTML=services.map(s=>`<div class="card p-5 flex flex-col"><h3 class="font-serif text-lg text-white">${esc(s.name)}</h3><div class="text-xs text-gray-500 mb-2">${s.duration} min</div>
+  <p class="text-sm text-gray-400 flex-1">${esc(s.description)||'Sin descripción'}</p><div class="text-2xl font-serif text-gold-accent mt-3">${money(s.price)}</div>
+  <div class="flex gap-2 mt-3"><button class="btn-sec !py-1.5 text-sm flex-1" onclick="editService('${s.id}')">Editar</button><button class="border border-red-500/40 text-red-400 rounded-lg px-3 py-1.5 text-sm hover:bg-red-500/10 transition" onclick="deleteService('${s.id}')">Eliminar</button></div></div>`).join('')}
+function openServiceModal(){$('svc-modal-title').textContent='Nuevo Servicio';['s-id','s-name','s-desc','s-price'].forEach(i=>$(i).value='');$('s-dur').value=30;openModal('modal-service')}
+function editService(id){
+ const s=services.find(x=>x.id===id);if(!s)return;$('svc-modal-title').textContent='Editar Servicio';
+ $('s-id').value=s.id;$('s-name').value=s.name;$('s-desc').value=s.description||'';$('s-price').value=s.price;$('s-dur').value=s.duration;openModal('modal-service')}
+async function handleSaveService(e){
+ e.preventDefault();const id=$('s-id').value;
+ const d={name:$('s-name').value.trim(),description:$('s-desc').value.trim(),price:Number($('s-price').value),duration:Number($('s-dur').value)};
+ if(id){Object.assign(services.find(x=>x.id===id),d);await apiPut('services',id,d)}
+ else{const s={id:'srv-'+Date.now(),...d};services.push(s);await apiPost('services',s)}
+ closeModal('modal-service');showToast('Servicio Guardado','El catálogo fue actualizado.');renderClientServices();populateServiceOptions();renderBarberServices()}
+async function deleteService(id){
+ if(!confirm('¿Deseas eliminar este servicio del catálogo?'))return;
+ services=services.filter(s=>s.id!==id);await apiDelete('services',id);renderClientServices();populateServiceOptions();renderBarberServices()}
+
+/* ═══ Walk-in ═══ */
+function walkInAutoPrice(){const s=services.find(x=>x.id===$('w-service').value);$('w-amount').value=s?s.price:''}
+function openWalkInModal(){$('w-name').value='';$('w-phone').value='';walkInAutoPrice();openModal('modal-walkin')}
+async function handleWalkInSubmit(e){
+ e.preventDefault();
+ const s=services.find(x=>x.id===$('w-service').value);if(!s)return;
+ const amount=Number($('w-amount').value)||0,phone=$('w-phone').value.trim(),name=$('w-name').value.trim();
+ const a={id:'apt-'+Date.now(),clientName:name,clientPhone:phone,serviceId:s.id,serviceName:s.name,barber:$('w-barber').value,date:todayStr(),time:nowTime(),price:amount,status:'Completado',paymentMethod:$('w-pay').value};
+ appointments.push(a);await apiPost('appointments',a);
+ if(phone){
+  let c=clients.find(x=>x.phone===phone);
+  if(c){c.visits++;c.spent+=amount;c.lastVisit=fmtDate(todayStr());await apiPut('clients',c.id,c)}
+  else{c={id:'cli-'+Date.now(),name,phone,email:'',visits:1,spent:amount,lastVisit:fmtDate(todayStr())};clients.push(c);await apiPost('clients',c)}}
+ closeModal('modal-walkin');showToast('Cobro Registrado','Atención guardada e ingresada en la caja.');renderBarberDashboard()}
+
+/* ═══ Exportar ═══ */
+function exportReport(){
+ const t=todayStr(),l=appointments.filter(a=>a.status==='Completado'&&a.date===t).sort((a,b)=>a.time.localeCompare(b.time));
+ let x=`RESUMEN DE CAJA DIARIA - LEGACY BARBER\nFecha: ${fmtDate(t)}\n`+'='.repeat(44)+'\n';
+ if(!l.length)x+='\nNo hay ventas registradas el día de hoy.\n';
+ else{x+=`Total de servicios completados: ${l.length}\nRecaudación total: ${money(sum(l))}\n\n`;l.forEach((a,i)=>x+=`${i+1}. [${a.time} hs] ${a.clientName} - ${a.serviceName} (${a.barber}) -> ${money(a.price)} [${a.paymentMethod}]\n`)}
+ const url=URL.createObjectURL(new Blob([x],{type:'text/plain;charset=utf-8'})),el=document.createElement('a');
+ el.href=url;el.download=`Caja_Barberia_${t}.txt`;document.body.appendChild(el);el.click();el.remove();URL.revokeObjectURL(url)}
+
+/* ═══ Inicio ═══ */
+async function init(){
+ services=await apiGet('services');clients=await apiGet('clients');appointments=await apiGet('appointments');
+ if(!services.length){services=DEFAULT_SERVICES.map(s=>({...s}));wr('services',services)}
+ $('b-barber').innerHTML=barberOpts;$('w-barber').innerHTML=barberOpts;
+ $('b-time').innerHTML=HOURS.map(h=>`<option value="${h}">${h} hs</option>`).join('');
+ $('b-date').min=todayStr();
+ renderClientServices();populateServiceOptions();
+ switchMode('client');switchClientTab('book');switchBarberTab('agenda');renderClientAppointments();
+}
+init();
+</script>
+</body>
+</html>
